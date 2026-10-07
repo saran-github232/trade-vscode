@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TradeVision AI — Options</title>
+    <style>
+      body { font: 14px system-ui; margin: 0; padding: 20px; background: #0d1117; color: #e6edf3; max-width: 720px; }
+      h1 { font-size: 18px; } h2 { font-size: 15px; margin-top: 24px; }
+      pre, #config { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 10px; overflow: auto; }
+      input { margin: 4px 0; padding: 6px; width: 100%; box-sizing: border-box; background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 4px; }
+      button { background: #238636; color: #fff; border: 0; border-radius: 6px; padding: 6px 12px; cursor: pointer; margin-right: 6px; }
+      .note { color: #8b949e; font-size: 12px; }
+      #secrets { list-style: none; padding: 0; } #secrets li { padding: 2px 0; }
+      #card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>TradeVision AI — Options</h1>
+    <p class="note">Local-first · paper trading · secrets never leave extension storage and are never sent to page scripts.</p>
+
+    <h2>Configuration</h2>
+    <pre id="config"></pre>
+
+    <h2>API key (optional, stored in extension storage)</h2>
+    <input id="key-name" placeholder="Provider name (e.g. openai)" />
+    <input id="key-value" type="password" placeholder="API key" />
+    <button id="save-key">Save key</button>
+    <ul id="secrets"></ul>
+
+    <h2>Run analysis (paper)</h2>
+    <button id="analyze">Analyze</button>
+    <div id="card"></div>
+
+    <script type="module" src="./options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "name": "trading-vscode",
+  "version": "0.0.1",
+  "private": true,
+  "description": "TradeVision AI — validation-first trading decision system",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "build": "node scripts/build.mjs",
+    "build:node": "tsc",
+    "test": "tsc && node --test dist/src/tests/",
+    "demo": "tsc && node dist/src/demo/run_demo.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "zod": "^3.25.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.71.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
