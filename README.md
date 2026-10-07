@@ -22,9 +22,9 @@ predictive value on unseen market data.**
 npm install
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint .
-npm test            # compile + node:test (54 tests)
+npm test            # compile + node:test (83 tests)
 npm run build       # esbuild production build -> dist/extension/
-npm run demo        # end-to-end demo (constraint gate + truth policy)
+npm run demo        # end-to-end demo (Phase 2 market data + constraint gate + truth policy)
 ```
 
 Load the unpacked extension: Chrome → `chrome://extensions` → Developer mode →
@@ -54,16 +54,25 @@ indicators, technicalFeatures, marketRegime, volatility, dataQuality`
 **Signal** — `direction (UP|DOWN|NO_TRADE), score, confidence,
 calibratedProbability?, timestamp, timeframe, evidence[], modelVotes[],
 riskStatus, modelVersion, dataQuality`
-## Files created (Phase 1)
+## Files created (Phases 1-2)
 
-**Types** — `src/types/market.ts`, `src/types/signal.ts`,
+**Types** — `src/types/market.ts` (incl. `DataQualityReport`,
+`MultiTimeframeContext`), `src/types/signal.ts`,
 `src/types/messaging.ts`, `src/types/chrome.d.ts`
 
 **Core engines** — `src/indicators/indicator_math.ts`,
 `src/indicators/indicator_engine.ts`, `src/services/market_regime_engine.ts`,
-`src/services/price_action_engine.ts`, `src/services/market_data_service.ts`,
-`src/services/chart_data_service.ts`, `src/services/chart_capture_service.ts`,
-`src/services/signal_engine.ts`, `src/services/analysis_service.ts`
+`src/services/price_action_engine.ts`, `src/services/market_data_service.ts`
+(shared-builder facade + `generateCandles` + `replay()`),
+`src/services/chart_data_service.ts`, `src/services/chart_capture_service.ts`
+(structured-first + vision fallback), `src/services/signal_engine.ts`,
+`src/services/analysis_service.ts` (quality gate + `SnapshotStore`)
+
+**Phase 2 market-data engine** — `src/marketData/candle_store.ts`,
+`src/marketData/timeframe_manager.ts`, `src/marketData/data_quality_engine.ts`,
+`src/marketData/market_snapshot_builder.ts` (single pipeline),
+`src/marketData/multi_timeframe.ts`, `src/marketData/chart_vision_service.ts`,
+`src/marketData/snapshot_store.ts`, `src/marketData/replay_mode.ts`
 
 **ML / AI / ensemble** — `src/ml/feature_engineering_engine.ts`,
 `src/ml/ml_inference_engine.ts`, `src/ml/training_pipeline.ts`,
@@ -90,7 +99,9 @@ riskStatus, modelVersion, dataQuality`
 `.gitignore`, `ARCHITECTURE.md` (this README updated)
 
 **Tests** — `src/tests/pipeline.test.ts`, `src/tests/security.test.ts`,
-`src/tests/engines.test.ts` (23 new assertions across these)
+`src/tests/engines.test.ts`, `src/tests/market_data.test.ts` (29 Phase 2
+deterministic tests: quality defects, multi-timeframe, vision fallback,
+live/replay parity)
 
 ## Files modified (Phase 1)
 
@@ -114,15 +125,25 @@ bundle), **`eslint`** + **`@eslint/js`** + **`typescript-eslint`** + **`globals`
 (lint). No `@types/chrome` — MV3 APIs are declared in
 `src/types/chrome.d.ts`.
 
-## Validation status (Phase 1)
+## Validation status (Phase 2)
 
 - `npm run typecheck` — ✅ clean
 - `npm run lint` — ✅ clean
-- `npm test` — ✅ 54/54 passing (31 pre-existing + 23 new)
+- `npm test` — ✅ 83/83 passing (54 pre-existing + 29 new Phase 2)
 - `npm run build` — ✅ `dist/extension/` produced (exit 0)
-- `npm run demo` — ✅ runs end-to-end (constraint gate + truth policy)
+- `npm run demo` — ✅ runs end-to-end (Phase 2 market data + constraint gate + truth policy)
 
-**Phase 2 is intentionally not started until this Phase 1 is stable.**
+### Phase 2 guarantees (tested)
+
+- **Structured > vision:** verified — vision-only capture yields
+  `snapshot: null` + `numericSnapshotAvailable: false`, `numericPrices: []`.
+- **Quality gate:** 8 defect classes scored 0-100; below `minDataQuality`
+  (default 70) `AnalysisService`/`SignalEngine`/`RiskEngine` force NO_TRADE.
+- **No fabrication:** absent context timeframes appear in `unavailable`,
+  never as snapshots.
+- **Single pipeline:** live, backtest, and replay share one
+  `MarketSnapshotBuilder` — replayed snapshots are byte-identical
+  (`snapshotId` match) to live builds.
 
 > `confidence` is model **conviction**, **not** a probability of winning.
 > `calibratedProbability` is only present after statistical calibration has

@@ -46,9 +46,18 @@ export class RiskEngine {
     confidence: number,
     snapshot: MarketSnapshot,
   ): RiskDecision {
-    // Insufficient data => never trade.
-    if (snapshot.dataQuality === "insufficient" || !snapshot.technicalFeatures.complete) {
-      return this.block(direction, "Insufficient or incomplete data quality.");
+    // Insufficient or below-threshold data quality => never trade (fail closed).
+    if (
+      snapshot.dataQuality === "insufficient" ||
+      snapshot.quality?.pass === false ||
+      !snapshot.technicalFeatures.complete
+    ) {
+      const score = snapshot.quality?.score ?? 0;
+      const threshold = snapshot.quality?.threshold ?? 0;
+      return this.block(
+        direction,
+        `Data quality rejected (score ${score} < threshold ${threshold}) or features incomplete.`,
+      );
     }
 
     // Extreme volatility => block.

@@ -1,53 +1,49 @@
 /**
- * MarketDataService — assembles MarketSnapshot objects.
+ * MarketDataService — facade over the shared MarketSnapshotBuilder.
+ *
+ * Phase 2: this class no longer computes anything itself. It delegates to a
+ * single MarketSnapshotBuilder instance so that live analysis, backtesting,
+ * and replay all run through the identical feature-generation pipeline
+ * (quality gate -> normalize -> indicators -> features -> regime).
  *
  * Local-first: consumes candles from an injected source (the extension's
- * content script, a user import, or the built-in deterministic generator
- * used for paper trading and tests). No network calls are made here.
+ * content script, a user import, or the deterministic generator used for
+ * paper trading and tests). No network calls are made here.
  */
 
-import type { Candle, MarketSnapshot, Timeframe } from "../types/market.js";
-import { IndicatorEngine } from "../indicators/indicator_engine.js";
-import { FeatureEngineeringEngine } from "../ml/feature_engineering_engine.js";
-import { MarketRegimeEngine } from "./market_regime_engine.js";
-
-/** Data quality grading based on freshness and completeness. */
-function gradeDataQuality(candles: Candle[], expected: number): MarketSnapshot["dataQuality"] {
-  if (candles.length < expected) return "insufficient";
-  if (candles.length < expected + 5) return "degraded";
-  return "good";
-}
+import type { Candle, CandleSource, MarketSnapshot, Timeframe } from "../types/market.js";
+import { MarketSnapshotBuilder } from "../marketData/market_snapshot_builder.js";
+import { ReplayMode } from "../marketData/replay_mode.js";
 
 export class MarketDataService {
-  private readonly indicators = new IndicatorEngine();
-  private readonly features = new FeatureEngineeringEngine();
-  private readonly regime = new MarketRegimeEngine();
+  /** The single shared builder — live, backtest, and replay all use this. */
+  readonly builder = new MarketSnapshotBuilder();
 
   /** Build a snapshot from a candle series (oldest first). */
-  buildSnapshot(asset: string, timeframe: Timeframe, candles: Candle[], timestamp: number): MarketSnapshot {
-    const indicatorSet = this.indicators.compute(candles);
-    const technicalFeatures = this.features.compute(candles, indicatorSet);
-    const volatility = technicalFeatures.volatility;
-    const marketRegime = this.regime.classify(candles, volatility);
-    const last = candles[candles.length - 1];
-
-    return {
+  buildSnapshot(
+    asset: string,
+    timeframe: Timeframe,
+    candles: Candle[],
+    timestamp: number,
+    source?: CandleSource,
+  ): MarketSnapshot {
+    return this.builder.build({
       asset,
-      timestamp,
       timeframe,
       candles,
-      currentPrice: last ? last.close : 0,
-      indicators: indicatorSet,
-      technicalFeatures,
-      marketRegime,
-      volatility,
-      dataQuality: gradeDataQuality(candles, 50),
-    };
+      timestamp,
+      ...(source !== undefined ? { source } : {}),
+    });
   }
 
   /** Flatten a snapshot into the ordered ML feature vector. */
   featureVector(snapshot: MarketSnapshot): number[] {
-    return this.features.toVector(snapshot.technicalFeatures);
+    return this.builder.featureVector(snapshot);
+  }
+
+  /** Replay historical candles through this exact builder (shared pipeline). */
+  replay(): ReplayMode {
+    return new ReplayMode(this.builder);
   }
 }
 
@@ -55,7 +51,13 @@ export class MarketDataService {
  * Deterministic local candle generator for paper trading / demos / tests.
  * A seeded PRNG produces a bounded random walk — no external data needed.
  */
-export function generateCandles(seed: number, count: number, startPrice = 100, timeframeMs = 300_000, startTime = 0): Candle[] {
+export function generateCandles(
+  seed: number,
+  count: number,
+  startPrice = 100,
+  timeframeMs = 300_000,
+  startTime = 0,
+): Candle[] {
   let state = seed >>> 0 || 1;
   const next = (): number => {
     // xorshift32

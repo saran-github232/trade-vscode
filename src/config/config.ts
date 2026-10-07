@@ -32,6 +32,13 @@ export interface AppConfig {
   maxRiskPerTrade: number;
   /** Comma-separated allow-list of assets. Empty = allow all. */
   allowedAssets: string[];
+  /**
+   * Minimum data-quality score (0-100) required before analysis is allowed.
+   * Below this, signals are forced to NO_TRADE (fail closed).
+   */
+  minDataQuality: number;
+  /** Age of the newest candle (ms) beyond which data is considered stale. */
+  staleAfterMs: number;
 }
 
 /** Build-time env vars esbuild injects as globalThis.__ENV__. */
@@ -81,6 +88,8 @@ function pick(env: Env, overrides: Partial<AppConfig>): AppConfig {
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
+    minDataQuality: num(env["TV_MIN_DATA_QUALITY"], 70),
+    staleAfterMs: num(env["TV_STALE_AFTER_MS"], 300_000),
   };
 
   return { ...base, ...overrides };

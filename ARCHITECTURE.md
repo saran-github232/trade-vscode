@@ -57,7 +57,8 @@ produces identical grounded output.
 | `src/content/` | Passive content script. Reads a `window.__TRADEVISION_DATA__` bridge, renders an extension-owned overlay, does **not** automate the platform. |
 | `src/popup/`, `src/sidepanel/`, `src/options/` | UI entry points (HTML + TS). |
 | `src/components/` | Shared rendering (`signal_card.ts`) + `ui_client.ts`. |
-| `src/services/` | `MarketDataService`, `ChartDataService`, `ChartCaptureService`, `PriceActionEngine`, `MarketRegimeEngine`, `SignalEngine`, `AnalysisService`. |
+| `src/services/` | `MarketDataService` (shared-builder facade), `ChartDataService`, `ChartCaptureService` (structured-first + vision fallback), `PriceActionEngine`, `MarketRegimeEngine`, `SignalEngine`, `AnalysisService`. |
+| `src/marketData/` | Phase 2 engine: `CandleStore`, `TimeframeManager`, `DataQualityEngine` (0-100), `MarketSnapshotBuilder` (single pipeline), `MultiTimeframeService`, `ChartVisionService` (visual-only), `SnapshotStore`, `ReplayMode`. |
 ## 4. Security model
 
 - **Secrets:** `SecretVault` stores keys in extension storage (or an in-memory
@@ -91,10 +92,23 @@ Read via `loadConfig()` (override > build-time `globalThis.__ENV__` >
 
 ## 7. Phase boundary
 
-This is **Phase 1** (stable: typecheck ✓, lint ✓, 54 tests ✓, production build
-✓, demo ✓). Phase 2 (not started): live market data adapters, real model
-training, walk-forward integration, and narrowing content-script host
-permissions to the specific chart domain.
+This is **Phase 2** (stable: typecheck ✓, lint ✓, 83 tests ✓, production
+build ✓, demo ✓ — including the Phase 2 Market Data & Chart Analysis Engine
+section):
+
+- **Structured > vision:** `ChartCaptureService` treats structured candles as
+  the numerical source of truth; the vision fallback (`ChartVisionService`)
+  yields qualitative context only and can never produce prices or indicators.
+- **Quality gate:** `DataQualityEngine` scores 0-100 over 8 defect classes
+  (duplicates, gaps, ordering, OHLC, staleness, unrealistic, incomplete);
+  `minDataQuality` (default 70, `TV_MIN_DATA_QUALITY`) forces NO_TRADE below
+  threshold in `AnalysisService`, `SignalEngine`, and `RiskEngine`.
+- **Multi-timeframe:** `TimeframeManager` + `MultiTimeframeService` use only
+  source-provided timeframes (unavailable ones reported, never fabricated).
+- **One pipeline:** live, backtest, and `ReplayMode` all build snapshots
+  through the same `MarketSnapshotBuilder`; deterministic `snapshotId`
+  (`snapshotId/timestamp/asset/timeframe/dataVersion/featureVersion`) stored
+  in `SnapshotStore` proves parity.
 | `src/indicators/` | `indicator_math.ts` (sma/ema/rsi/macd/bollinger) + `IndicatorEngine`. |
 | `src/ml/` | `FeatureEngineeringEngine`, `MLInferenceEngine`, `TrainingPipeline`, `DriftDetectionEngine`. |
 | `src/ai/` | `AIModelRouter` (SecretHandle-based, https-enforced), `AIAnalystEngine` (truth-policy gated). |

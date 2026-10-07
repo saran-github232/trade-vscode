@@ -21,6 +21,11 @@ import {
 import { runControlledRetrain } from "../phases/phase10_retrain/retrain_pipeline.js";
 import { decide } from "../prod/production_gate.js";
 import { checkClaimIsSafe } from "../policy/truth_policy.js";
+import { MarketDataService, generateCandles } from "../services/market_data_service.js";
+import { MultiTimeframeService } from "../marketData/multi_timeframe.js";
+import { ChartVisionService } from "../marketData/chart_vision_service.js";
+import { SignalEngine } from "../services/signal_engine.js";
+import { MLInferenceEngine } from "../ml/ml_inference_engine.js";
 
 interface DemoMetrics {
   validationAccuracy: number;
@@ -55,8 +60,77 @@ function demoMetrics(overrides: Partial<DemoMetrics> = {}): DemoMetrics {
   };
 }
 
+/**
+ * Phase 2: Market Data & Chart Analysis Engine.
+ *
+ * Demonstrates the structured-first data path, the 0-100 quality gate,
+ * multi-timeframe context (never fabricated), the vision fallback (visual
+ * context only), and live/replay parity through the shared builder.
+ */
+async function demoPhase2(): Promise<void> {
+  const md = new MarketDataService();
+  const candles = generateCandles(42, 120, 100, 300_000, 1_700_000_000_000);
+  const lastClose = candles[candles.length - 1]!.closeTime;
+
+  console.log("[Phase 2 Market Data & Chart Analysis Engine]");
+
+  // 1. Structured data is the numerical source of truth, gated 0-100.
+  const clean = md.builder.build({ asset: "EURUSD", timeframe: "5m", candles, timestamp: lastClose });
+  console.log(
+    `  quality (clean): score=${clean.quality.score} grade=${clean.dataQuality} pass=${clean.quality.pass}`,
+  );
+
+  // 2. Stale/delayed data falls below threshold and is rejected.
+  const stale = md.builder.build({
+    asset: "EURUSD",
+    timeframe: "5m",
+    candles,
+    timestamp: lastClose,
+    now: lastClose + 5 * 3_600_000, // simulated feed delay
+  });
+  console.log(
+    `  quality (stale): score=${stale.quality.score} grade=${stale.dataQuality} pass=${stale.quality.pass}`,
+  );
+
+  const engine = new SignalEngine({ models: [new MLInferenceEngine()] });
+  const blocked = engine.analyze(stale, md.featureVector(stale));
+  console.log(`  stale signal: ${blocked.direction} (risk=${blocked.riskStatus})`);
+
+  // 3. Multi-timeframe: only timeframes the source actually provided.
+  const mtf = new MultiTimeframeService(md.builder);
+  const m1 = generateCandles(1, 60, 100, 60_000, 1_700_000_000_000);
+  const m5 = generateCandles(2, 60, 100, 300_000, 1_700_000_000_000);
+  const { context } = mtf.build({
+    asset: "EURUSD",
+    primary: "1m",
+    series: { "1m": m1, "5m": m5 },
+    timestamp: lastClose,
+  });
+  console.log(
+    `  multi-timeframe: primary=${context.primary} context=[${context.related
+      .map((r) => r.timeframe)
+      .join(", ")}] unavailable=[${context.unavailable.join(", ")}]`,
+  );
+
+  // 4. Vision fallback: visual context only, never a numeric snapshot.
+  const vision = new ChartVisionService().extractContext({ ref: "shot://demo", capturedAt: lastClose });
+  console.log(
+    `  vision fallback: prices=${vision.context.numericPrices.length} numericSnapshotAvailable=${vision.numericSnapshotAvailable} dropped=${vision.droppedNumericAttempts}`,
+  );
+
+  // 5. Replay reuses the exact builder live analysis uses (anti-drift).
+  const live = md.buildSnapshot("EURUSD", "5m", candles.slice(0, 100), candles[99]!.closeTime, "replay");
+  const replay = md.replay().buildAt(candles, 99, { asset: "EURUSD", timeframe: "5m" });
+  console.log(
+    `  replay==live: ${replay.snapshot.snapshotId === live.snapshotId} (snapshotId=${replay.snapshot.snapshotId})`,
+  );
+  console.log("");
+}
+
 async function main() {
   console.log("=== TradeVision AI Demonstration ===\n");
+
+  await demoPhase2();
 
   // --- Step 1: Phase 7 Backtest ---
   const lineup: BacktestLineup = {
