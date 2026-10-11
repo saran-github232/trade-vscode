@@ -10,9 +10,14 @@
  * Usage:
  *   node scripts/dev.mjs          # initial build + watch until Ctrl+C
  *   node scripts/dev.mjs --once   # single build, then exit (CI / scripted)
+ *
+ * Watch mode intentionally keeps the terminal alive and idle between
+ * changes; every save triggers an incremental rebuild followed by a
+ * "reload your extension" hint, so the process never looks stuck.
  */
 
 import { context } from "esbuild";
+import { watch } from "node:fs";
 import { mkdir, copyFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +26,33 @@ const root = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(root, "..");
 const outDir = join(projectRoot, "dist", "extension");
 const once = process.argv.includes("--once");
+
+// esbuild's ctx.watch() fires its own startup rebuild(s), which makes
+// build-counting unreliable for "was this a real change?". Instead a native
+// fs watcher on src/ marks real edits; the first build that SUCCEEDS after
+// an edit prints the "reload your extension" hint (exactly one line per
+// save). Build errors are always reported, from either context.
+let pendingChange = false;
+function buildReporterPlugin() {
+  return {
+    name: "build-reporter",
+    setup(build) {
+      build.onEnd((result) => {
+        if (result.errors.length > 0) {
+          pendingChange = false;
+          console.error(
+            `[dev] Build FAILED (${result.errors.length} error(s)) — fix the code and save again; watching continues.`,
+          );
+        } else if (pendingChange) {
+          pendingChange = false;
+          console.log(
+            "[dev] Rebuild done -> press the reload (R) button on the extension card in chrome://extensions.",
+          );
+        }
+      });
+    },
+  };
+}
 
 // Development environment injection (only TV_* + NODE_ENV are exposed).
 const env = {
@@ -71,7 +103,10 @@ async function main() {
     },
     outdir: outDir,
     entryNames: "[dir]/[name]",
-    plugins: [{ name: "copy-assets", setup: (b) => b.onEnd(copyAssets) }],
+    plugins: [
+      { name: "copy-assets", setup: (b) => b.onEnd(copyAssets) },
+      buildReporterPlugin(),
+    ],
   });
 
   // Content script as IIFE (cannot be a module in MV3 content scripts).
@@ -80,6 +115,7 @@ async function main() {
     format: "iife",
     entryPoints: [join(projectRoot, "src/content/content_script.ts")],
     outfile: join(outDir, "content/content_script.js"),
+    plugins: [buildReporterPlugin()],
   });
 
   await esmCtx.rebuild();
@@ -94,7 +130,29 @@ async function main() {
 
   await esmCtx.watch();
   await iifeCtx.watch();
-  console.log(`\nWatching for changes -> ${outDir} (Ctrl+C to stop)`);
+  // Native fs watcher marks real edits (esbuild's own startup rebuilds are
+  // not edits, so they never print a spurious "[dev] Rebuild done").
+  watch(join(projectRoot, "src"), { recursive: true }, () => {
+    pendingChange = true;
+  });
+  console.log(
+    [
+      "",
+      `Dev build ready -> ${outDir}`,
+      "",
+      "This is a WATCHER, not a one-shot build: the terminal staying idle is normal.",
+      "  1. Chrome -> chrome://extensions -> Developer mode -> Load unpacked ->",
+      `     select: ${outDir}  (do this once).`,
+      "  2. Edit any file under src/ -> it rebuilds automatically in milliseconds",
+      "     (watch this terminal for the [dev] Rebuild done hint).",
+      "  3. After each rebuild press the reload (R) button on the extension card.",
+      "",
+      "Stop the watcher with Ctrl+C. Want a single build that exits instead?",
+      "  npm run dev -- --once",
+      "",
+      "Watching for changes...",
+    ].join("\n"),
+  );
 }
 
 main().catch((err) => {

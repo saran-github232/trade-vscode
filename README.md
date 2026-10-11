@@ -31,6 +31,12 @@ npm run demo        # end-to-end demo (Phase 2 market data + constraint gate + t
 Load the unpacked extension: Chrome → `chrome://extensions` → Developer mode →
 **Load unpacked** → select `dist/extension/`.
 
+> **`npm run dev` is a watcher, not a one-shot build.** After the first build
+> the terminal idles *on purpose*: it rebuilds automatically whenever files
+> under `src/` change (watch for the `[dev] Rebuild done` hint), then press
+> the reload (R) button on the extension card. It only exits with **Ctrl+C**.
+> Use `npm run dev -- --once` when you want a single build that exits.
+
 ## Commands
 
 | Command | What it does |
