@@ -22,7 +22,8 @@ predictive value on unseen market data.**
 npm install
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint .
-npm test            # compile + node:test (83 tests)
+npm test            # compile + node:test (116 tests)
+npm run dev         # dev build (unminified + sourcemaps) + watch -> dist/extension/
 npm run build       # esbuild production build -> dist/extension/
 npm run demo        # end-to-end demo (Phase 2 market data + constraint gate + truth policy)
 ```
@@ -37,6 +38,7 @@ Load the unpacked extension: Chrome → `chrome://extensions` → Developer mode
 | `npm run typecheck` | Strict TypeScript type-check (no emit). |
 | `npm run lint` | ESLint 9 (flat config) over the whole repo. |
 | `npm test` | Compiles to `dist/` and runs all `node:test` suites. |
+| `npm run dev` | Development esbuild **watch** build (unminified, sourcemaps, `NODE_ENV=development`) into `dist/extension/`. Add `-- --once` for a single build. |
 | `npm run build` | Production esbuild bundle of all 5 extension entry points. |
 | `npm run build:node` | Emit the Node/test build to `dist/`. |
 | `npm run demo` | Runs the end-to-end constraint + truth-policy demo. |
@@ -74,6 +76,18 @@ riskStatus, modelVersion, dataQuality`
 `src/marketData/multi_timeframe.ts`, `src/marketData/chart_vision_service.ts`,
 `src/marketData/snapshot_store.ts`, `src/marketData/replay_mode.ts`
 
+**Phase 3 technical-analysis engine** — `src/technical/trend_engine.ts`,
+`src/technical/momentum_engine.ts`, `src/technical/volatility_engine.ts`,
+`src/technical/swing_structure_engine.ts`,
+`src/technical/support_resistance_engine.ts`,
+`src/technical/breakout_engine.ts`, `src/technical/pullback_engine.ts`,
+`src/technical/candle_structure_engine.ts`,
+`src/technical/technical_analysis_engine.ts` (aggregator),
+`src/technical/utils.ts`, `src/types/technical.ts`
+(`TechnicalEvidence` on every `MarketSnapshot`); Phase 3 indicators
+(ATR14/ADX14/Stochastic/ROC12/MOM10/volatility20/VWAP) added to
+`src/indicators/indicator_math.ts` + `indicator_engine.ts`
+
 **ML / AI / ensemble** — `src/ml/feature_engineering_engine.ts`,
 `src/ml/ml_inference_engine.ts`, `src/ml/training_pipeline.ts`,
 `src/ml/drift_detection_engine.ts`, `src/ai/ai_model_router.ts`,
@@ -95,13 +109,15 @@ riskStatus, modelVersion, dataQuality`
 `src/options/{options.ts,options.html}`,
 `src/components/{signal_card.ts,ui_client.ts}`
 
-**Tooling / docs** — `scripts/build.mjs`, `eslint.config.mjs`,
-`.gitignore`, `ARCHITECTURE.md` (this README updated)
+**Tooling / docs** — `scripts/build.mjs`, `scripts/dev.mjs` (dev watch
+build), `eslint.config.mjs`, `.gitignore`, `ARCHITECTURE.md` (this README
+updated)
 
 **Tests** — `src/tests/pipeline.test.ts`, `src/tests/security.test.ts`,
 `src/tests/engines.test.ts`, `src/tests/market_data.test.ts` (29 Phase 2
 deterministic tests: quality defects, multi-timeframe, vision fallback,
-live/replay parity)
+live/replay parity), `src/tests/technical.test.ts` +
+`technical_{a,b,c}.test.ts` (Phase 3 indicator & analysis-engine tests)
 
 ## Files modified (Phase 1)
 
@@ -125,11 +141,12 @@ bundle), **`eslint`** + **`@eslint/js`** + **`typescript-eslint`** + **`globals`
 (lint). No `@types/chrome` — MV3 APIs are declared in
 `src/types/chrome.d.ts`.
 
-## Validation status (Phase 2)
+## Validation status (Phases 2-3)
 
 - `npm run typecheck` — ✅ clean
 - `npm run lint` — ✅ clean
-- `npm test` — ✅ 83/83 passing (54 pre-existing + 29 new Phase 2)
+- `npm test` — ✅ 116/116 passing (54 Phase 1 + 29 Phase 2 + 33 Phase 3)
+- `npm run dev` — ✅ dev bundle + watch rebuilds into `dist/extension/` (`-- --once` for single build)
 - `npm run build` — ✅ `dist/extension/` produced (exit 0)
 - `npm run demo` — ✅ runs end-to-end (Phase 2 market data + constraint gate + truth policy)
 
@@ -144,6 +161,18 @@ bundle), **`eslint`** + **`@eslint/js`** + **`typescript-eslint`** + **`globals`
 - **Single pipeline:** live, backtest, and replay share one
   `MarketSnapshotBuilder` — replayed snapshots are byte-identical
   (`snapshotId` match) to live builds.
+
+### Phase 3 guarantees (tested)
+
+- **Fail-closed indicators:** ATR/ADX/Stochastic/ROC/MOM return `null`
+  (never a misleading number) when history is insufficient.
+- **ADX noise floor:** directional movement below 1% of a bar's true range
+  is wick noise; bars with no directional movement contribute 0 DX, so a
+  flat/micro-wick range cannot fake a "perfect trend" (ADX ~0 on a range,
+  ~100 on a steady trend).
+- **One vote per input:** each trend/momentum/structure input is a single
+  vote; `TrendEngine` labels flat ranges `SIDEWAYS` (weak ADX mutes score
+  to 0), never a directional state without evidence.
 
 > `confidence` is model **conviction**, **not** a probability of winning.
 > `calibratedProbability` is only present after statistical calibration has

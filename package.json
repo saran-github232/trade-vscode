@@ -7,6 +7,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "build:node": "tsc",
     "test": "tsc && node --test dist/src/tests/",
