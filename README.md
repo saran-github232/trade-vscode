@@ -29,7 +29,11 @@ npm run demo        # end-to-end demo (Phase 2 market data + constraint gate + t
 ```
 
 Load the unpacked extension: Chrome → `chrome://extensions` → Developer mode →
-**Load unpacked** → select `dist/extension/`.
+**Load unpacked** → select **`dist/extension/`**.
+
+> ⚠️ **Select the `dist/extension/` folder — NOT the project root.** The folder
+> you pick must contain `manifest.json` (and `content/content_script.js`).
+> Picking `C:\AndroidPro\trading vscode` fails with *"Could not load manifest"*. 
 
 > **`npm run dev` is a watcher, not a one-shot build.** After the first build
 > the terminal idles *on purpose*: it rebuilds automatically whenever files

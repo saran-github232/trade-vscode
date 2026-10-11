@@ -76,6 +76,12 @@ async function main() {
   }
 
   console.log(`\nBuild complete -> ${outDir}`);
+  console.log(
+    `Load unpacked in Chrome: chrome://extensions -> Developer mode -> Load unpacked -> ${outDir}`,
+  );
+  console.log(
+    "IMPORTANT: select THAT folder (dist/extension) — NOT the project root; the selected folder must contain manifest.json.",
+  );
 }
 
 main().catch((err) => {
