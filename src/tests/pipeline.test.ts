@@ -76,7 +76,7 @@ test("risk engine forces NO_TRADE when confidence is below minimum", () => {
   const neutral = new MLInferenceEngine({
     modelId: "neutral",
     version: "0.0.1",
-    weights: [0, 0, 0, 0, 0, 0],
+    weights: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     bias: 0,
   });
   const forced = new SignalEngine({ models: [neutral] });

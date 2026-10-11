@@ -247,7 +247,7 @@ test("every snapshot carries snapshotId/timestamp/asset/timeframe/dataVersion/fe
   assert.equal(snap.asset, "EURUSD");
   assert.equal(snap.timeframe, "5m");
   assert.equal(snap.dataVersion, "ohlcv_v1");
-  assert.equal(snap.featureVersion, "features_v1");
+  assert.equal(snap.featureVersion, "features_v2");
   assert.equal(snap.source, "structured");
   assert.equal(typeof snap.quality.score, "number");
   assert.equal(snap.quality.pass, true);

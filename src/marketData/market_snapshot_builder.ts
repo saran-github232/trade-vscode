@@ -20,8 +20,10 @@ import type {
   TechnicalFeatures,
   Timeframe,
 } from "../types/market.js";
+import type { TechnicalEvidence } from "../types/technical.js";
 import { IndicatorEngine } from "../indicators/indicator_engine.js";
 import { FeatureEngineeringEngine } from "../ml/feature_engineering_engine.js";
+import { TechnicalAnalysisEngine } from "../technical/technical_analysis_engine.js";
 import { MarketRegimeEngine } from "../services/market_regime_engine.js";
 import { CandleStore, type RawCandle } from "./candle_store.js";
 import { TimeframeManager } from "./timeframe_manager.js";
@@ -35,7 +37,7 @@ export interface SnapshotVersions {
 
 export const DEFAULT_VERSIONS: SnapshotVersions = {
   dataVersion: "ohlcv_v1",
-  featureVersion: "features_v1",
+  featureVersion: "features_v2",
 };
 
 export interface BuildParams {
@@ -74,6 +76,7 @@ export class MarketSnapshotBuilder {
   readonly qualityEngine: DataQualityEngine;
   private readonly indicators = new IndicatorEngine();
   private readonly features = new FeatureEngineeringEngine();
+  private readonly technical = new TechnicalAnalysisEngine();
   private readonly regime = new MarketRegimeEngine();
   readonly versions: SnapshotVersions;
 
@@ -109,7 +112,8 @@ export class MarketSnapshotBuilder {
 
     // 3. The shared feature-generation pipeline (identical everywhere).
     const indicators: IndicatorSet = this.indicators.compute(candles);
-    const technicalFeatures: TechnicalFeatures = this.features.compute(candles, indicators);
+    const technical: TechnicalEvidence = this.technical.analyze(candles, indicators);
+    const technicalFeatures: TechnicalFeatures = this.features.compute(candles, indicators, technical.scores);
     const volatility = technicalFeatures.volatility;
     const marketRegime = this.regime.classify(candles, volatility);
     const last = candles[candles.length - 1];
@@ -126,6 +130,7 @@ export class MarketSnapshotBuilder {
       currentPrice: last ? last.close : 0,
       indicators,
       technicalFeatures,
+      technical,
       marketRegime,
       volatility,
       dataQuality: quality.grade,

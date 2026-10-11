@@ -131,7 +131,7 @@ test("backtest-style candle walk runs end-to-end (smoke)", () => {
   for (let i = 60; i < candles.length - 1; i++) {
     const snap = md.buildSnapshot("EURUSD", "5m", candles.slice(0, i + 1), i);
     const feat = md.featureVector(snap);
-    assert.ok(feat.length === 6);
+    assert.ok(feat.length === 14);
     if (snap.dataQuality !== "insufficient") directions++;
   }
   assert.ok(directions > 0);

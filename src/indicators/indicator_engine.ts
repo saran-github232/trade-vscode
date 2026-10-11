@@ -6,7 +6,7 @@
  */
 
 import type { Candle, IndicatorSet } from "../types/market.js";
-import { bollinger, ema, macd, rsi, sma } from "./indicator_math.js";
+import { adx, atr, bollinger, ema, macd, momentum, roc, rsi, sma, stochastic, volatility, vwap } from "./indicator_math.js";
 
 export class IndicatorEngine {
   /** Compute indicators from a candle series (oldest first). */
@@ -20,6 +20,13 @@ export class IndicatorEngine {
       rsi14: rsi(closes, 14),
       macd: macd(closes),
       bollinger: bollinger(closes, 20),
+      atr14: atr(candles, 14),
+      adx14: adx(candles, 14),
+      stoch: stochastic(candles, 14, 3),
+      roc12: roc(closes, 12),
+      mom10: momentum(closes, 10),
+      volatility20: volatility(closes, 20),
+      vwap: vwap(candles),
     };
   }
 }

@@ -5,6 +5,8 @@
  * Every downstream engine consumes a MarketSnapshot and never mutates it.
  */
 
+import type { TechnicalEvidence } from "./technical.js";
+
 /** Supported order types. UP/DOWN is the primary vocabulary (binary-friendly). */
 export type Direction = "UP" | "DOWN" | "NO_TRADE";
 
@@ -85,6 +87,20 @@ export interface IndicatorSet {
   macd: { line: number; signal: number; histogram: number } | null;
   /** Bollinger band mid/upper/lower. */
   bollinger: { mid: number; upper: number; lower: number } | null;
+  /** Average True Range (Wilder 14); null if insufficient history. */
+  atr14: number | null;
+  /** ADX trend strength + directional movement; null if insufficient history. */
+  adx14: { adx: number; plusDI: number; minusDI: number } | null;
+  /** Stochastic %K / %D; null if insufficient history. */
+  stoch: { k: number; d: number } | null;
+  /** Rate of change (12) in percent; null if insufficient history. */
+  roc12: number | null;
+  /** Momentum (10) in points; null if insufficient history. */
+  mom10: number | null;
+  /** Realized volatility (std of returns, 20). 0 when unmeasurable. */
+  volatility20: number;
+  /** VWAP; null when no volume info ("where appropriate"). */
+  vwap: number | null;
 }
 
 /** Derived technical features (normalized) fed into the ML feature vector. */
@@ -101,6 +117,22 @@ export interface TechnicalFeatures {
   rangePosition: number;
   /** Current close relative to SMA20 (normalized). */
   sma20Deviation: number;
+  /** Phase 3: combined trend conviction in [-1, 1]. */
+  trendScore: number;
+  /** Phase 3: combined momentum conviction in [-1, 1]. */
+  momentumScore: number;
+  /** Phase 3: volatility magnitude in [0, 1] (non-directional). */
+  volatilityScore: number;
+  /** Phase 3: swing-structure conviction in [-1, 1]. */
+  structureScore: number;
+  /** Phase 3: support-reaction conviction in [-1, 1] (+ = bullish hold). */
+  supportScore: number;
+  /** Phase 3: resistance-pressure in [-1, 1] (+ = bearish hold). */
+  resistanceScore: number;
+  /** Phase 3: breakout conviction in [-1, 1]. */
+  breakoutScore: number;
+  /** Phase 3: candle-pattern conviction in [-1, 1]. */
+  candleScore: number;
   /** True if enough history existed to compute all features. */
   complete: boolean;
 }
@@ -149,6 +181,8 @@ export interface MarketSnapshot {
   currentPrice: number;
   indicators: IndicatorSet;
   technicalFeatures: TechnicalFeatures;
+  /** Phase 3 explainable technical verdict (scores + evidence + events). */
+  technical: TechnicalEvidence;
   marketRegime: MarketRegime;
   /** Realized volatility over the analysis window (0 = flat). */
   volatility: number;

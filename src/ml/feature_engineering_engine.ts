@@ -6,6 +6,7 @@
  */
 
 import type { Candle, IndicatorSet, TechnicalFeatures } from "../types/market.js";
+import type { TechnicalScores } from "../types/technical.js";
 import { stddev } from "../indicators/indicator_math.js";
 
 /** Rescale RSI (0-100) to [-1, 1] with 50 -> 0. */
@@ -14,8 +15,20 @@ function rsiNorm(rsi: number | null): number {
   return (rsi - 50) / 50;
 }
 
+/** Zero Phase 3 scores (used when the technical verdict is unavailable). */
+export const ZERO_TECHNICAL_SCORES: TechnicalScores = {
+  trendScore: 0,
+  momentumScore: 0,
+  volatilityScore: 0,
+  structureScore: 0,
+  supportScore: 0,
+  resistanceScore: 0,
+  breakoutScore: 0,
+  candleScore: 0,
+};
+
 export class FeatureEngineeringEngine {
-  compute(candles: Candle[], indicators: IndicatorSet): TechnicalFeatures {
+  compute(candles: Candle[], indicators: IndicatorSet, scores: TechnicalScores = ZERO_TECHNICAL_SCORES): TechnicalFeatures {
     const closes = candles.map((c) => c.close);
     const last = closes[closes.length - 1];
     const prev = closes[closes.length - 2];
@@ -61,6 +74,14 @@ export class FeatureEngineeringEngine {
       volatility,
       rangePosition,
       sma20Deviation,
+      trendScore: scores.trendScore,
+      momentumScore: scores.momentumScore,
+      volatilityScore: scores.volatilityScore,
+      structureScore: scores.structureScore,
+      supportScore: scores.supportScore,
+      resistanceScore: scores.resistanceScore,
+      breakoutScore: scores.breakoutScore,
+      candleScore: scores.candleScore,
       complete,
     };
   }
@@ -74,6 +95,14 @@ export class FeatureEngineeringEngine {
       f.volatility,
       f.rangePosition,
       f.sma20Deviation,
+      f.trendScore,
+      f.momentumScore,
+      f.volatilityScore,
+      f.structureScore,
+      f.supportScore,
+      f.resistanceScore,
+      f.breakoutScore,
+      f.candleScore,
     ];
   }
 }

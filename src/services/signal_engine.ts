@@ -56,8 +56,21 @@ export class SignalEngine {
     // Risk gate can force NO_TRADE.
     const riskDecision = this.risk.evaluate(decision.direction, conf.confidence, snapshot);
 
-    // Evidence: price action + regime.
-    const evidence: Evidence[] = this.priceAction.analyze(snapshot.candles);
+    // Evidence: technical verdict (Phase 3) + price action + regime.
+    const evidence: Evidence[] = [];
+    if (snapshot.technical) {
+      const t = snapshot.technical;
+      evidence.push({
+        kind: `technical_${t.direction.toLowerCase()}`,
+        detail: `Technical verdict ${t.direction} (score ${t.score.toFixed(2)}, ${t.trendState.toLowerCase()}): ` +
+          t.evidence.slice(0, 5).map((e) => e.detail).join(" "),
+      });
+      for (const e of t.evidence.slice(0, 6)) {
+        if (e.kind === "technical_verdict" || e.kind === "technical_insufficient") continue;
+        evidence.push({ kind: e.kind, detail: e.detail });
+      }
+    }
+    evidence.push(...this.priceAction.analyze(snapshot.candles));
     evidence.push({
       kind: "regime",
       detail: `Market regime: ${snapshot.marketRegime}.`,
